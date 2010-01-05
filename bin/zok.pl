@@ -136,12 +136,12 @@ sub _get_latest_feed {
 
 sub _on_timer {
     my $c = shift;
-    return 10 unless $c->{in_channel};
+    return 600 unless $c->{in_channel};
 
     foreach my $feed ( Model::Feeds->select() ) {
         _update($c, $feed); #TODO: different POE session?
     }
-    return 10;  # seconds until next call
+    return 600;  # seconds until next call (600 -> 10 minutes)
 }
 
 sub _update {
