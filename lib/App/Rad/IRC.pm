@@ -68,8 +68,8 @@ sub run {
 
                 irc_disconnected => "irc_disconnected_state",
                 irc_error        => "irc_error_state",
-#
-#                irc_join         => "irc_chanjoin_state",
+
+                irc_join         => "irc_chanjoin_state",
 #                irc_part         => "irc_chanpart_state",
 #                irc_kick         => "irc_kicked_state",
 #                irc_nick         => "irc_nick_state",
@@ -88,7 +88,7 @@ sub run {
 #                irc_391          => "_time_state",
 #                _get_time        => "_get_time_state",
 #                
-#                tick => "tick_state",
+                tick => "tick_state",
             }
         ]
     );
@@ -125,7 +125,14 @@ sub parse_input {
     return;
 }
 
-sub help { return 'accepted commands: ' . join ', ', $_[0]->commands }
+sub help { 
+    my $c = shift;
+#    if ( $c->is_command( $c->stash->{body} ) ) {
+#        return App::Rad::Help::get_help_attr_for($c, $c->stash->{body});
+#    }
+    return 'accepted commands: ' . join ', ', $c->commands 
+}
+
 sub teardown {}
 sub default {}
 sub invalid { $_[0]->{_functions}->{default}->(@_) }
@@ -158,7 +165,7 @@ sub start_state {
 
     $kernel->delay('reconnect', 1 );
 
-#    $kernel->delay('tick', 30);
+    $kernel->delay('tick', 5);
 }
 
 sub reconnect {
@@ -210,9 +217,19 @@ sub irc_001_state {
         $kernel->post( $self->{Ircname}, 'join', $channel );
     }
 
-#    $self->schedule_tick(5);
+    $self->schedule_tick(5);
 
 #    $self->connected();
+}
+
+sub irc_chanjoin_state {
+    my ($self, $channel, $nick) = @_[OBJECT, ARG1, ARG0];
+    $_[KERNEL]->delay( 'reconnect', $self->{Timeout} );
+
+    ($nick) = (split /!/, $nick);
+    if ($self->{Nick} eq $nick) {
+        $self->{in_channel} = 1; #TODO: remove workaround
+    }
 }
 
 sub irc_disconnected_state {
@@ -237,6 +254,7 @@ sub irc_public_state {
     $kernel->delay( 'reconnect', $self->{Timeout} );
 
     my ($nick, $channel, $body) = @_[ ARG0, ARG1, ARG2 ];
+    $self->stash->{from} = $nick;
 
     # the irc protocol allows messages sent to
     # multiple targets, but we don't care.
@@ -249,6 +267,21 @@ sub irc_public_state {
     $self->parse_input($body);
     $self->execute();
 }
+
+sub tick_state {
+    my ( $self, $kernel, $heap ) = @_[ OBJECT, KERNEL, HEAP ];
+#    my $delay = $self->tick();
+    my $delay = main::_on_timer($self);
+    $self->schedule_tick($delay) if $delay;
+}
+
+sub schedule_tick {
+  my $self = shift;
+  my $time = shift || 5;
+  $self->{kernel}->delay( tick => $time );
+}
+
+sub tick { print STDERR "moo\n"; return 5 }
 
 #####################
 ## our new methods ##
