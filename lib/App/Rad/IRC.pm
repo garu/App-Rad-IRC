@@ -254,7 +254,8 @@ sub irc_public_state {
     $kernel->delay( 'reconnect', $self->{Timeout} );
 
     my ($nick, $channel, $body) = @_[ ARG0, ARG1, ARG2 ];
-    $self->stash->{from} = $nick;
+    ($self->stash->{from}) = split /!/, $nick;
+    $self->stash->{from_full} = $nick;
 
     # the irc protocol allows messages sent to
     # multiple targets, but we don't care.
