@@ -60,7 +60,8 @@ sub run {
                 _stop  => "stop_state",
 
                 irc_001          => "irc_001_state",
-#                irc_msg          => "irc_said_state",
+#                _default         => 'irc_default',
+                irc_msg          => "irc_privmsg_state",
                 irc_public       => "irc_public_state",
 #                irc_ctcp_action  => "irc_emoted_state",
                 irc_ping         => "irc_ping_state",
@@ -140,7 +141,7 @@ sub pre_process {}
 sub post_process {
     my $self = shift;
     if ( $self->output ) {
-        $self->say($self->output);
+        $self->reply($self->output);
     }
 }
 
@@ -203,6 +204,23 @@ sub stop_state {
 
     $kernel->post( $self->{Ircname}, 'quit', 'hasta' );
     $kernel->alias_remove($self->{ALIASNAME});
+}
+
+sub irc_default {
+    my ($event, $args) = @_[ARG0 .. $#_];
+    print "unhandled $event\n";
+    my $arg_number = 0;
+    foreach (@$args) {
+        print "  ARG$arg_number = ";
+        if (ref($_) eq 'ARRAY') {
+            print "$_ = [", join(", ", @$_), "]\n";
+        }
+        else {
+            print "'$_'\n";
+        }
+        $arg_number++;
+    }
+    return 0;    # Don't handle signals.
 }
 
 sub irc_001_state {
@@ -269,6 +287,10 @@ sub irc_public_state {
     $self->execute();
 }
 
+sub irc_privmsg_state {
+    goto &irc_public_state;
+}
+
 sub tick_state {
     my ( $self, $kernel, $heap ) = @_[ OBJECT, KERNEL, HEAP ];
 #    my $delay = $self->tick();
@@ -290,17 +312,23 @@ sub tick { print STDERR "moo\n"; return 5 }
 
 sub addressed { return $_[0]->{addressed} }
 
-sub say {
-    my $self = shift;
-    return unless @_ > 0;
+sub reply {
+    my ($self, $message) = (@_);
+    return unless $message;
+    my $target = $self->stash->{channel} || $self->stash->{from};
 
-    my ($channel, $message);
-    if (@_ == 1) {
-        $message = shift;
-    }
+    $poe_kernel->post( $self->{Ircname}, 'privmsg',
+                       $target,
+                       $message
+                     );
+}
+
+sub say {
+    my ($self, $target, $message) = (@_);
+    return unless $target and $message; 
 
     $poe_kernel->post( $self->{Ircname}, 'privmsg', 
-                       $self->stash->{channel}, 
+                       $target, 
                        $message
                      );
 }
